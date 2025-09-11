@@ -11,7 +11,7 @@ import SwiftUI
 struct AniDexApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            PhotoScreen()
         }
     }
 }
