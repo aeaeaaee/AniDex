@@ -1,7 +1,9 @@
 import SwiftUI
 import UIKit
 import AVFoundation
- 
+import PhotosUI
+import UniformTypeIdentifiers
+
 private enum CameraAlertContext {
     case none
     case notDetermined
@@ -10,8 +12,9 @@ private enum CameraAlertContext {
 }
 
 struct PhotoScreen: View {
-    private let bottomBarHeight: CGFloat = 70
+    @State private var selectedTab: MenuTab = .photo
     @State private var isShowingCamera = false
+    @State private var isShowingPhotoPicker = false
     @State private var capturedImage: UIImage?
     @State private var savedImageURL: URL?
     @State private var showCameraAlert = false
@@ -20,57 +23,64 @@ struct PhotoScreen: View {
     @State private var cameraAlertContext: CameraAlertContext = .none
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            // Main placeholder content
-            VStack(spacing: 12) {
-                Spacer()
-                if let image = capturedImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .padding(.horizontal)
-                    if let url = savedImageURL {
-                        Text("Saved: \(url.lastPathComponent)")
-                            .font(.caption)
+        ZStack() {
+            if selectedTab == .photo {
+                // Main placeholder content
+                VStack(alignment:.center, spacing: 12) {
+                    Spacer()
+                    if let image = capturedImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .padding(.horizontal)
+                        if let url = savedImageURL {
+                            Text("Saved: \(url.lastPathComponent)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 64))
+                            .foregroundStyle(.secondary)
+                        Text("Take or upload a photo to identify")
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                } else {
-                    Image(systemName: "photo.on.rectangle.angled")
-                        .font(.system(size: 64))
-                        .foregroundStyle(.secondary)
-                    Text("Take or upload a photo to identify")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-
-            // Floating action buttons (lower-right)
-            VStack(alignment: .trailing, spacing: 12) {
-                Button {
-                    handleTakePhotoTapped()
-                } label: {
-                    Label("Take Photo", systemImage: "camera.fill")
-                        .font(.headline)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(.tint, in: Capsule())
-                        .foregroundStyle(.white)
+                    Spacer()
                 }
 
-                Button {
-                    // TODO: Open photo library
-                } label: {
-                    Label("Upload Photo", systemImage: "photo.fill.on.rectangle.fill")
-                        .font(.headline)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(.ultraThinMaterial, in: Capsule())
+                // Floating action buttons (lower-right)
+                VStack(alignment: .trailing, spacing: 12) {
+                    Spacer()
+                    Button {
+                        handleTakePhotoTapped()
+                    } label: {
+                        Label("Take Photo", systemImage: "camera.fill")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(.tint, in: Capsule())
+                            .foregroundStyle(.white)
+                    }
+
+                    Button {
+                        isShowingPhotoPicker = true
+                    } label: {
+                        Label("Upload Photo", systemImage: "photo.fill.on.rectangle.fill")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(.ultraThinMaterial, in: Capsule())
+                    }
+                    
                 }
+                .padding(.trailing, -200)
+                .padding(.bottom,4)
+            } else {
+                AniDexScreen(selectedTab: $selectedTab)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .padding(.trailing, 16)
-            .padding(.bottom, bottomBarHeight + 16)
         }
         // Title block under the island / status bar
         .safeAreaInset(edge: .top) {
@@ -81,11 +91,15 @@ struct PhotoScreen: View {
         }
         // Bottom menu bar
         .safeAreaInset(edge: .bottom) {
-            BottomMenuBar(selected: .photo)
+            BottomMenuBar(selected: $selectedTab)
         }
         // Present native camera
         .sheet(isPresented: $isShowingCamera) {
             CameraPicker(image: $capturedImage, isPresented: $isShowingCamera)
+        }
+        // Present native photo library (PHPicker)
+        .sheet(isPresented: $isShowingPhotoPicker) {
+            PhotoLibraryPicker(image: $capturedImage, isPresented: $isShowingPhotoPicker)
         }
         // Alerts for camera unavailability or permission issues
         .alert(cameraAlertTitle, isPresented: $showCameraAlert) {
@@ -111,36 +125,37 @@ private struct TitleBlock: View {
             Text("Identify animals and plants from photos")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            Divider()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-private enum MenuTab {
+enum MenuTab {
     case photo
     case anidex
 }
 
-private struct BottomMenuBar: View {
-    var selected: MenuTab
+struct BottomMenuBar: View {
+    @Binding var selected: MenuTab
 
     var body: some View {
         HStack(spacing: 0) {
             menuButton(.photo, title: "Photo", systemImage: "camera")
+            Divider()
             menuButton(.anidex, title: "AniDex", systemImage: "list.bullet")
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
-        .padding(.bottom, 22)
-        .frame(maxWidth: .infinity)
-        .background(.ultraThinMaterial)
+        .frame(maxWidth: .infinity, maxHeight: 60)
+        .background(.thinMaterial)
     }
 
     @ViewBuilder
     private func menuButton(_ tab: MenuTab, title: String, systemImage: String) -> some View {
         let isSelected = (tab == selected)
         Button {
-            // TODO: Navigate to tab
+            selected = tab
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: systemImage)
@@ -298,6 +313,45 @@ private struct CameraPicker: UIViewControllerRepresentable {
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.isPresented = false
+        }
+    }
+}
+
+// MARK: - Photo Library Picker Wrapper
+
+private struct PhotoLibraryPicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    @Binding var isPresented: Bool
+
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var config = PHPickerConfiguration(photoLibrary: .shared())
+        config.filter = .images
+        config.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        let parent: PhotoLibraryPicker
+        init(_ parent: PhotoLibraryPicker) { self.parent = parent }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            defer { DispatchQueue.main.async { self.parent.isPresented = false } }
+            guard let provider = results.first?.itemProvider else { return }
+            // Prefer loading raw data to avoid sending non-Sendable objects across threads.
+            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, error in
+                    guard let data = data, let uiImage = UIImage(data: data) else { return }
+                    DispatchQueue.main.async {
+                        self.parent.image = uiImage
+                    }
+                }
+            }
         }
     }
 }
