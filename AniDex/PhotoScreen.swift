@@ -12,6 +12,7 @@ private enum CameraAlertContext {
 }
 
 struct PhotoScreen: View {
+    private let bottomBarHeight: CGFloat = 60
     @State private var selectedTab: MenuTab = .photo
     @State private var isShowingCamera = false
     @State private var isShowingPhotoPicker = false
@@ -23,10 +24,10 @@ struct PhotoScreen: View {
     @State private var cameraAlertContext: CameraAlertContext = .none
 
     var body: some View {
-        ZStack() {
+        ZStack(alignment: .bottomTrailing) {
             if selectedTab == .photo {
                 // Main placeholder content
-                VStack(alignment:.center, spacing: 12) {
+                VStack(spacing: 12) {
                     Spacer()
                     if let image = capturedImage {
                         Image(uiImage: image)
@@ -49,10 +50,26 @@ struct PhotoScreen: View {
                     }
                     Spacer()
                 }
-
-                // Floating action buttons (lower-right)
-                VStack(alignment: .trailing, spacing: 12) {
-                    Spacer()
+            } else {
+                AniDexScreen(selectedTab: $selectedTab)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        // Title block under the island / status bar
+        .safeAreaInset(edge: .top) {
+            TitleBlock()
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .background(.thinMaterial)
+        }
+        // Bottom menu bar
+        .safeAreaInset(edge: .bottom) {
+            BottomMenuBar(selected: $selectedTab)
+        }
+        // Floating action buttons over everything, including the bottom bar
+        .overlay(alignment: .bottomTrailing) {
+            if selectedTab == .photo {
+                VStack(alignment: .trailing, spacing: 8) {
                     Button {
                         handleTakePhotoTapped()
                     } label: {
@@ -73,25 +90,10 @@ struct PhotoScreen: View {
                             .padding(.vertical, 12)
                             .background(.ultraThinMaterial, in: Capsule())
                     }
-                    
                 }
-                .padding(.trailing, -200)
-                .padding(.bottom,4)
-            } else {
-                AniDexScreen(selectedTab: $selectedTab)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.trailing, 16)
+                .padding(.bottom, bottomBarHeight + 16)
             }
-        }
-        // Title block under the island / status bar
-        .safeAreaInset(edge: .top) {
-            TitleBlock()
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .background(.thinMaterial)
-        }
-        // Bottom menu bar
-        .safeAreaInset(edge: .bottom) {
-            BottomMenuBar(selected: $selectedTab)
         }
         // Present native camera
         .sheet(isPresented: $isShowingCamera) {
@@ -110,8 +112,8 @@ struct PhotoScreen: View {
             Text(cameraAlertMessage)
         }
         // Save captured image into app storage
-        .onChange(of: capturedImage) { newImage in
-            guard let image = newImage else { return }
+        .onChange(of: capturedImage) { oldValue, newValue in
+            guard let image = newValue else { return }
             savedImageURL = saveImageToAppFolder(image)
         }
     }
@@ -119,13 +121,9 @@ struct PhotoScreen: View {
 
 private struct TitleBlock: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("AniDex")
-                .font(.title.bold())
-            Text("Identify animals and plants from photos")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .center, spacing: 8) {
             Divider()
+                .frame(height:2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
