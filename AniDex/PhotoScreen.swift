@@ -22,6 +22,8 @@ struct PhotoScreen: View {
     @State private var cameraAlertTitle = ""
     @State private var cameraAlertMessage = ""
     @State private var cameraAlertContext: CameraAlertContext = .none
+    @State private var analysis: PhotoAnalysis?
+    @State private var isAnalyzing: Bool = false
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -39,6 +41,13 @@ struct PhotoScreen: View {
                             Text("Saved: \(url.lastPathComponent)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+                        if isAnalyzing {
+                            ProgressView("Analyzing...")
+                                .padding(.top, 4)
+                        } else if let best = analysis?.bestLabel {
+                            Text("Tag: \(best.label) \(Int(best.confidence * 100))%")
+                                .font(.headline)
                         }
                     } else {
                         Image(systemName: "photo.on.rectangle.angled")
@@ -113,8 +122,23 @@ struct PhotoScreen: View {
         }
         // Save captured image into app storage
         .onChange(of: capturedImage) { oldValue, newValue in
-            guard let image = newValue else { return }
+            guard let image = newValue else {
+                analysis = nil
+                savedImageURL = nil
+                return
+            }
             savedImageURL = saveImageToAppFolder(image)
+            analysis = nil
+            Task { @MainActor in
+                isAnalyzing = true
+                do {
+                    let result = try await Intelligence.shared.analyze(image: image)
+                    analysis = result
+                } catch {
+                    print("Analysis failed: \(error)")
+                }
+                isAnalyzing = false
+            }
         }
     }
 }
