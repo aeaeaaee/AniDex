@@ -65,6 +65,5 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 
 # Windsurf
-.md
+*.md
 
-Swift.gitignore
